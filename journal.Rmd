@@ -20,19 +20,83 @@ knitr::opts_chunk$set(message=FALSE,warning=FALSE, cache=TRUE)
 
 This is an `.Rmd` file. It is plain text with special features. Any time you write just like this, it will be compiled to normal text in the website. If you put a \# in front of your text, it will create a top level-header.
 
-# My first post
+# Challenge 1
 
 Last compiled: `r Sys.Date()`
+import librarys:
+```{r}
+library(tidyverse)
+library(readxl)
+library(lubridate)
 
-Notice that whatever you define as a top level header, automatically gets put into the table of contents bar on the left. 
+```
+open files
+```{r}
+bikes_tbl      <- read_excel(path = "01_raw_data/bikes.xlsx")
+orderlines_tbl <- read_excel("01_raw_data/orderlines.xlsx")
+bikeshops_tbl  <- read_excel("01_raw_data/bikeshops.xlsx")
+```
+## Part 1
+seperating city and state
+```{r}
 
-## Second level header
+bikeshops_tbl <- separate(
+  data = bikeshops_tbl,
+  col = location,
+  into = c("city", "state"),
+  sep = ", ",
+  remove = TRUE,
+  convert = FALSE,
+  extra = "warn",
+  fill = "warn"
+)
 
-You can add more headers by adding more hashtags. These won't be put into the table of contents
+```
+merging data sets to include orders
+```{r}
+sales_local <- left_join(bikeshops_tbl, orderlines_tbl, by = c("bikeshop.id" = "customer.id"))
+sales_local_price <- left_join(sales_local, bikes_tbl, by = c("product.id" = "bike.id"))
+```
 
-### third level header
 
-Here's an even lower level header
+sales_state contains total sales by state
+```{r}
+sales_state <- tibble(state = unlist(unique(sales_local["state"])), sales = c(1:12))
+for(i in 1:dim(sales_state)[1]){
+  st <- unlist(sales_state[i,1])
+  sales_state[i,2] <- sum(filter(sales_local_price, state == st)$price * filter(sales_local_price, state == st)$quantity)
+}
+```
+Plot Date by state
+```{r}
+ggplot(data = sales_state, aes(x=state, y=sales)) +
+  geom_col(fill = "#2DC6D6") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Part 2
+sales by state and year
+```{r}
+year2016 <- as.POSIXct("2016-01-01")
+year2017 <- as.POSIXct("2017-01-01")
+year2018 <- as.POSIXct("2018-01-01")
+year2019 <- as.POSIXct("2019-01-01")
+year2020 <- as.POSIXct("2020-01-01")
+
+sales_state_year <- tibble(state = unlist(rep(unique(sales_local["state"]),each = 5)), year = c(rep(2015,12),rep(2016,12), rep(2017,12), rep(2018,12), rep(2019,12)), sales = c(1:60))
+for(i in 1:length(sales_state_year$state)){
+  sales_state_year[i,3] <- sum(filter(sales_local_price, state == unlist(sales_state_year[i,1]) & year(order.date) ==  unlist(sales_state_year[i,2]))$price * filter(sales_local_price, state == unlist(sales_state_year[i,1]) & year(order.date) == unlist(sales_state_year[i,2]))$quantity)
+
+}
+```
+plot sales by state and year
+```{r}
+ggplot(data = sales_state_year, aes(x=year, y = sales)) +
+  geom_col(fill = "#2DC6D6") +
+  facet_wrap(~state) 
+```
+
+```{r}
+```
 
 # My second post (note the order)
 
