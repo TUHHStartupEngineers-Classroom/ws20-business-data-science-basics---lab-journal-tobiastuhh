@@ -98,14 +98,46 @@ ggplot(data = sales_state_year, aes(x=year, y = sales)) +
 ```{r}
 ```
 
-# My second post (note the order)
+# Challenge 2
 
 Last compiled: `r Sys.Date()`
+import librarys
+```{r}
+library(httr)
+library("rstudioapi")
+library(jsonlite)
+library(rvest)
+library(dplyr)
+```
+## Part 1
+get names of trainstations when searching for Hamburg in the api of Deutsche Bahn
+```{r}
+#db_base_url <- "https://api.deutschebahn.com/fahrplan-plus/v1/location"
+#city = "Hamburg"
+#db_api_url <- paste(db_base_url, city, sep = "/")
+#db_api_data <- GET(db_api_url, add_headers(Authorization = paste("Bearer", key = askForPassword("token"), sep = " ")))
+#db_json_data <- fromJSON(content(db_api_data, as = "text"))$name
+#save(db_json_data, file = "db_json_data.Rdata")
+load(file = "db_json_data.Rdata")
+db_json_data
+```
 
-I'm writing this tutorial going from the top down. And, this is how it will be printed. So, notice the second post is second in the list. If you want your most recent post to be at the top, then make a new post starting at the top. If you want the oldest first, do, then keep adding to the bottom
+## Part 2
 
+Displaying name and price of all Rennrads on https://www.rosebikes.de/
+```{r}
+bike_url_base <- "https://www.rosebikes.de/fahrr%C3%A4der"
+bike_cat <- "rennrad"
+bike_url <- paste(bike_url_base, bike_cat, sep = "/")
+bike_html <- read_html(bike_url)
+bike_data_raw <- html_nodes(bike_html, ".catalog-category-bikes__price-title , .catalog-category-bikes__title-text")
+bike_data_clean <- html_text(bike_data_raw, trim = TRUE)
+bike_names <- c(bike_data_clean[1],bike_data_clean[3],bike_data_clean[5],bike_data_clean[7],bike_data_clean[9],bike_data_clean[11],bike_data_clean[13],bike_data_clean[15],bike_data_clean[17])
+bike_prices <- c(bike_data_clean[2],bike_data_clean[4],bike_data_clean[6],bike_data_clean[8],bike_data_clean[10],bike_data_clean[12],bike_data_clean[14],bike_data_clean[16],bike_data_clean[18])
+bike_db <- tibble(bike_names,bike_prices)
+bike_db
+```
 # Adding R stuff
-
 So far this is just a blog where you can write in plain text and serve your writing to a webpage. One of the main purposes of this lab journal is to record your progress learning R. The reason I am asking you to use this process is because you can both make a website, and a lab journal, and learn R all in R-studio. This makes everything really convenient and in the same place. 
 
 So, let's say you are learning how to make a histogram in R. For example, maybe you want to sample 100 numbers from a normal distribution with mean = 0, and standard deviation = 1, and then you want to plot a histogram. You can do this right here by using an r code block, like this:
