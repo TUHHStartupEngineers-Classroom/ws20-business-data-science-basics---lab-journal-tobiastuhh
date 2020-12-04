@@ -110,7 +110,8 @@ library(rvest)
 library(dplyr)
 ```
 ## Part 1
-get names of trainstations when searching for Hamburg in the api of Deutsche Bahn
+get names of trainstations when searching for Hamburg in the api of Deutsche Bahn.
+I used the code from the comments in another file to create the db_json_data.Rdata file because the askForPassword function does not work in the markdown file
 ```{r}
 #db_base_url <- "https://api.deutschebahn.com/fahrplan-plus/v1/location"
 #city = "Hamburg"
@@ -137,14 +138,116 @@ bike_prices <- c(bike_data_clean[2],bike_data_clean[4],bike_data_clean[6],bike_d
 bike_db <- tibble(bike_names,bike_prices)
 bike_db
 ```
-# Adding R stuff
-So far this is just a blog where you can write in plain text and serve your writing to a webpage. One of the main purposes of this lab journal is to record your progress learning R. The reason I am asking you to use this process is because you can both make a website, and a lab journal, and learn R all in R-studio. This makes everything really convenient and in the same place. 
+# Challenge 3
+Code to compute the results using data from https://www.patentsview.org/download/
+```{r, eval = FALSE}
+library(vroom)
+library(dplyr)
+library(lubridate)
 
-So, let's say you are learning how to make a histogram in R. For example, maybe you want to sample 100 numbers from a normal distribution with mean = 0, and standard deviation = 1, and then you want to plot a histogram. You can do this right here by using an r code block, like this:
+# Part 1
+col_types_assignee <- list(
+  id = col_character(),
+  type = col_character(),
+  name_first = col_character(),
+  name_last = col_character(),
+  organization = col_character()
+)
+assignee_tbl <- vroom(
+  file       = "assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_assignee,
+  na         = c("", "NA", "NULL")
+)
 
-```{r}
-samples <- rnorm(100, mean=0, sd=1)
-hist(samples)
+
+col_types_patent_assignee <- list(
+  patent_id = col_character(),
+  assignee_id = col_character(),
+  location_id = col_character()
+)
+patent_assignee_tbl <- vroom(
+  file       = "patent_assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_patent_assignee,
+  na         = c("", "NA", "NULL")
+)
+
+num_patent_by_assignee_id <- count(patent_assignee_tbl,assignee_id)
+num_patent_by_assignee_id_t <- left_join(num_patent_by_assignee_id,assignee_tbl,by = c("assignee_id" = "id"))
+num_patent_by_assignee_id_us <- filter(num_patent_by_assignee_id_t, type == 2)
+num_patent_by_assignee_id_d <- arrange(num_patent_by_assignee_id_us,desc(n))
+top_ten_id <- num_patent_by_assignee_id_d[1:10,1]
+top_ten_name_id <- filter(assignee_tbl, id %in% unlist(top_ten_id))
+top_ten_name <- top_ten_name_id$organization    
+
+# Part 2
+col_types_patent <- list(
+  id = col_character(),
+  type = col_character(),
+  number = col_character(),
+  country = col_character(),
+  date = col_date("%Y-%m-%d"),
+  abstract = col_character(),
+  title = col_character()
+  
+)
+patent_tbl <- vroom(
+  file       = "patent.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_patent,
+  na         = c("", "NA", "NULL")
+)
+patent_2019_tbl <- filter(patent_tbl, year(date) == 2019)
+patent_assignee_2019_tbl <- filter(patent_assignee_tbl, patent_id %in% unlist(patent_2019_tbl$id))
+
+num_patent_by_assignee_id <- count(patent_assignee_2019_tbl,assignee_id)
+num_patent_by_assignee_id_t <- left_join(num_patent_by_assignee_id,assignee_tbl,by = c("assignee_id" = "id"))
+num_patent_by_assignee_id_us <- filter(num_patent_by_assignee_id_t, type == 2)
+num_patent_by_assignee_id_d <- arrange(num_patent_by_assignee_id_us,desc(n))
+top_ten_id <- num_patent_by_assignee_id_d[1:10,1]
+top_ten_name_id <- filter(assignee_tbl, id %in% unlist(top_ten_id))
+top_ten_name_2019 <- top_ten_name_id$organization   
+
+# Part 3
+col_types_uspc <- list(
+  uuid = col_character(),
+  patent_id = col_character(),
+  mainclass_id = col_character(),
+  subclass_id = col_character(),
+  sequence = col_character()
+  
+)
+uspc_tbl <- vroom(
+  file       = "uspc.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_uspc,
+  na         = c("", "NA", "NULL")
+)
+
+num_patent_by_assignee_id <- count(patent_assignee_tbl,assignee_id)
+num_patent_by_assignee_id_t <- left_join(num_patent_by_assignee_id,assignee_tbl,by = c("assignee_id" = "id"))
+num_patent_by_assignee_id_d <- arrange(num_patent_by_assignee_id_t,desc(n))
+top_ten_id <- num_patent_by_assignee_id_d[1:10,1]
+top_ten_id_m <- lapply(top_ten_id, substring, first = 5)
+top_ten_i <- filter(uspc_tbl, uuid %in% top_ten_name_id_m$id)
+
+
+save(top_ten_name, top_ten_name_2019, file = "Challenge3.Rdata")
 ```
 
-When you knit this R Markdown document, you will see that the histogram is printed to the page, along with the R code. This document can be set up to hide the R code in the webpage, just delete the comment (hashtag) from the cold folding option in the yaml header up top. For purposes of letting yourself see the code, and me see the code, best to keep it the way that it is. You'll learn that all of these things and more can be customized in each R code block.
+```{r}
+load(file = "Challenge3.Rdata")
+```
+## Part 3.1
+Top ten US companys by number of patents
+```{r}
+top_ten_name
+```
+## Part 3.2
+Top ten US companys by patents in 2019
+```{r}
+top_ten_name_2019
+```
+## Part 3.3
+Does not work :(
