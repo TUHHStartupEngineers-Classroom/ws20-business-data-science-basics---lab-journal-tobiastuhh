@@ -145,6 +145,7 @@ library(vroom)
 library(dplyr)
 library(lubridate)
 
+
 # Part 1
 col_types_assignee <- list(
   id = col_character(),
@@ -229,11 +230,18 @@ num_patent_by_assignee_id <- count(patent_assignee_tbl,assignee_id)
 num_patent_by_assignee_id_t <- left_join(num_patent_by_assignee_id,assignee_tbl,by = c("assignee_id" = "id"))
 num_patent_by_assignee_id_d <- arrange(num_patent_by_assignee_id_t,desc(n))
 top_ten_id <- num_patent_by_assignee_id_d[1:10,1]
-top_ten_id_m <- lapply(top_ten_id, substring, first = 5)
-top_ten_i <- filter(uspc_tbl, uuid %in% top_ten_name_id_m$id)
+top_ten_patent_id <- tibble(assignee_id = top_ten_id$assignee_id, patent_id = c(0,0,0,0,0,0,0,0,0,0))
+for(i in 1:length(top_ten_patent_id$assignee_id)){
+  top_ten_patent_id$patent_id[i] <- filter(patent_assignee_tbl, assignee_id == unlist(top_ten_patent_id$assignee_id[i]))$patent_id[1]
+}
+top_ten_mainclass_id <- left_join(top_ten_patent_id, uspc_tbl,by = "patent_id")
+top_ten_mainclass_id <- top_ten_mainclass_id[complete.cases(top_ten_mainclass_id),]
+top_main <- count(top_ten_mainclass_id, mainclass_id)
+top_main <- arrange(top_main, desc(n))
+top_five_main <- top_main[1:5,]
+top_main_five <- top_five_main$mainclass_id
+save(top_ten_name, top_ten_name_2019, top_main_five, file = "Challenge3.Rdata")
 
-
-save(top_ten_name, top_ten_name_2019, file = "Challenge3.Rdata")
 ```
 
 ```{r}
@@ -250,7 +258,11 @@ Top ten US companys by patents in 2019
 top_ten_name_2019
 ```
 ## Part 3.3
-Does not work :(
+Top five mainclasses
+```{r}
+load(file = "Challenge3.Rdata")
+print(top_main_five)
+```
 
 # Challenge 4
 Solution for the covid challenge
