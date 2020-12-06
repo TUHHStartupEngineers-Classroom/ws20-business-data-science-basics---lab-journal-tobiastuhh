@@ -251,3 +251,68 @@ top_ten_name_2019
 ```
 ## Part 3.3
 Does not work :(
+
+# Challenge 4
+Solution for the covid challenge
+## Challenge 4.1
+Total cases over time
+```{r}
+library(tidyverse)
+
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+covid_data_tbl$dateRep <- as.Date(covid_data_tbl$dateRep,format='%d/%m/%Y')
+covid_by_date_tbl <- tibble(date = unique(covid_data_tbl$dateRep), cases = length(unique(covid_data_tbl$dateRep)):1)
+covid_by_date_tbl <- arrange(covid_by_date_tbl, date)
+
+for(i in 1:length(covid_by_date_tbl$date)){
+  covid_by_date_tbl[i,2] <- sum(filter(covid_data_tbl, dateRep == unlist(covid_by_date_tbl[i,1]))$cases)
+}
+covid_by_date_sum_tbl <- covid_by_date_tbl
+for(i in 1:length(covid_by_date_tbl$date)){
+  for(j in 1:length(covid_by_date_tbl$date)){
+    if(j < i){
+      covid_by_date_sum_tbl[i,2] <- covid_by_date_sum_tbl[i,2] + covid_by_date_tbl[j,2]
+    }
+    
+  }
+}
+ggplot(data = covid_by_date_sum_tbl, aes(x = date, y = cases, color = 'red')) + 
+  geom_line(size = 1) + 
+  geom_text(label =  max(covid_by_date_sum_tbl$cases),x  = 1, y = 1) + 
+  theme_light() 
+```
+
+
+### Challenge 4.2
+Mortality rate by region
+```{r}
+library(tidyverse)
+
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+
+world <- map_data("world")
+
+covid_data_tbl <- covid_data_tbl %>% 
+  mutate(across(countriesAndTerritories, str_replace_all, "_", " ")) %>%
+  mutate(countriesAndTerritories = case_when(
+    
+    countriesAndTerritories == "United Kingdom" ~ "UK",
+    countriesAndTerritories == "United States of America" ~ "USA",
+    countriesAndTerritories == "Czechia" ~ "Czech Republic",
+    TRUE ~ countriesAndTerritories
+    
+  ))
+
+
+covid_country_tbl <- tibble(region = unique(covid_data_tbl$countriesAndTerritories), ratio = 0)
+for(i in 1:length(covid_country_tbl$region)){
+  covid_country_tbl$ratio[i] <- sum(filter(covid_data_tbl, countriesAndTerritories == unlist(covid_country_tbl$region[i]))$deaths) / 
+    filter(covid_data_tbl, countriesAndTerritories == unlist(covid_country_tbl$region[i]))$popData2019[1]
+}
+
+
+
+covid_country_tbl %>% ggplot(aes(fill = ratio)) +
+  geom_map(aes(map_id = region), map = world) + 
+  expand_limits(x = world$long, y = world$lat)
+```
