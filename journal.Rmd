@@ -1,6 +1,6 @@
 ---
 title: "Journal (reproducible report)"
-author: "Joschka Schwarz"
+author: "Tobias Schollmeier"
 date: "2020-11-05"
 output:
   html_document:
@@ -20,35 +20,311 @@ knitr::opts_chunk$set(message=FALSE,warning=FALSE, cache=TRUE)
 
 This is an `.Rmd` file. It is plain text with special features. Any time you write just like this, it will be compiled to normal text in the website. If you put a \# in front of your text, it will create a top level-header.
 
-# My first post
+# Challenge 1
 
 Last compiled: `r Sys.Date()`
-
-Notice that whatever you define as a top level header, automatically gets put into the table of contents bar on the left. 
-
-## Second level header
-
-You can add more headers by adding more hashtags. These won't be put into the table of contents
-
-### third level header
-
-Here's an even lower level header
-
-# My second post (note the order)
-
-Last compiled: `r Sys.Date()`
-
-I'm writing this tutorial going from the top down. And, this is how it will be printed. So, notice the second post is second in the list. If you want your most recent post to be at the top, then make a new post starting at the top. If you want the oldest first, do, then keep adding to the bottom
-
-# Adding R stuff
-
-So far this is just a blog where you can write in plain text and serve your writing to a webpage. One of the main purposes of this lab journal is to record your progress learning R. The reason I am asking you to use this process is because you can both make a website, and a lab journal, and learn R all in R-studio. This makes everything really convenient and in the same place. 
-
-So, let's say you are learning how to make a histogram in R. For example, maybe you want to sample 100 numbers from a normal distribution with mean = 0, and standard deviation = 1, and then you want to plot a histogram. You can do this right here by using an r code block, like this:
-
+import librarys:
 ```{r}
-samples <- rnorm(100, mean=0, sd=1)
-hist(samples)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+
+```
+open files
+```{r}
+bikes_tbl      <- read_excel(path = "01_raw_data/bikes.xlsx")
+orderlines_tbl <- read_excel("01_raw_data/orderlines.xlsx")
+bikeshops_tbl  <- read_excel("01_raw_data/bikeshops.xlsx")
+```
+## Part 1
+seperating city and state
+```{r}
+
+bikeshops_tbl <- separate(
+  data = bikeshops_tbl,
+  col = location,
+  into = c("city", "state"),
+  sep = ", ",
+  remove = TRUE,
+  convert = FALSE,
+  extra = "warn",
+  fill = "warn"
+)
+
+```
+merging data sets to include orders
+```{r}
+sales_local <- left_join(bikeshops_tbl, orderlines_tbl, by = c("bikeshop.id" = "customer.id"))
+sales_local_price <- left_join(sales_local, bikes_tbl, by = c("product.id" = "bike.id"))
 ```
 
-When you knit this R Markdown document, you will see that the histogram is printed to the page, along with the R code. This document can be set up to hide the R code in the webpage, just delete the comment (hashtag) from the cold folding option in the yaml header up top. For purposes of letting yourself see the code, and me see the code, best to keep it the way that it is. You'll learn that all of these things and more can be customized in each R code block.
+
+sales_state contains total sales by state
+```{r}
+sales_state <- tibble(state = unlist(unique(sales_local["state"])), sales = c(1:12))
+for(i in 1:dim(sales_state)[1]){
+  st <- unlist(sales_state[i,1])
+  sales_state[i,2] <- sum(filter(sales_local_price, state == st)$price * filter(sales_local_price, state == st)$quantity)
+}
+```
+Plot Date by state
+```{r}
+ggplot(data = sales_state, aes(x=state, y=sales)) +
+  geom_col(fill = "#2DC6D6") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Part 2
+sales by state and year
+```{r}
+year2016 <- as.POSIXct("2016-01-01")
+year2017 <- as.POSIXct("2017-01-01")
+year2018 <- as.POSIXct("2018-01-01")
+year2019 <- as.POSIXct("2019-01-01")
+year2020 <- as.POSIXct("2020-01-01")
+
+sales_state_year <- tibble(state = unlist(rep(unique(sales_local["state"]),each = 5)), year = c(rep(2015,12),rep(2016,12), rep(2017,12), rep(2018,12), rep(2019,12)), sales = c(1:60))
+for(i in 1:length(sales_state_year$state)){
+  sales_state_year[i,3] <- sum(filter(sales_local_price, state == unlist(sales_state_year[i,1]) & year(order.date) ==  unlist(sales_state_year[i,2]))$price * filter(sales_local_price, state == unlist(sales_state_year[i,1]) & year(order.date) == unlist(sales_state_year[i,2]))$quantity)
+
+}
+```
+plot sales by state and year
+```{r}
+ggplot(data = sales_state_year, aes(x=year, y = sales)) +
+  geom_col(fill = "#2DC6D6") +
+  facet_wrap(~state) 
+```
+
+```{r}
+```
+
+# Challenge 2
+
+Last compiled: `r Sys.Date()`
+import librarys
+```{r}
+library(httr)
+library("rstudioapi")
+library(jsonlite)
+library(rvest)
+library(dplyr)
+```
+## Part 1
+get names of trainstations when searching for Hamburg in the api of Deutsche Bahn.
+I used the code from the comments in another file to create the db_json_data.Rdata file because the askForPassword function does not work in the markdown file
+```{r}
+#db_base_url <- "https://api.deutschebahn.com/fahrplan-plus/v1/location"
+#city = "Hamburg"
+#db_api_url <- paste(db_base_url, city, sep = "/")
+#db_api_data <- GET(db_api_url, add_headers(Authorization = paste("Bearer", key = askForPassword("token"), sep = " ")))
+#db_json_data <- fromJSON(content(db_api_data, as = "text"))$name
+#save(db_json_data, file = "db_json_data.Rdata")
+load(file = "db_json_data.Rdata")
+db_json_data
+```
+
+## Part 2
+
+Displaying name and price of all Rennrads on https://www.rosebikes.de/
+```{r}
+bike_url_base <- "https://www.rosebikes.de/fahrr%C3%A4der"
+bike_cat <- "rennrad"
+bike_url <- paste(bike_url_base, bike_cat, sep = "/")
+bike_html <- read_html(bike_url)
+bike_data_raw <- html_nodes(bike_html, ".catalog-category-bikes__price-title , .catalog-category-bikes__title-text")
+bike_data_clean <- html_text(bike_data_raw, trim = TRUE)
+bike_names <- c(bike_data_clean[1],bike_data_clean[3],bike_data_clean[5],bike_data_clean[7],bike_data_clean[9],bike_data_clean[11],bike_data_clean[13],bike_data_clean[15],bike_data_clean[17])
+bike_prices <- c(bike_data_clean[2],bike_data_clean[4],bike_data_clean[6],bike_data_clean[8],bike_data_clean[10],bike_data_clean[12],bike_data_clean[14],bike_data_clean[16],bike_data_clean[18])
+bike_db <- tibble(bike_names,bike_prices)
+bike_db
+```
+# Challenge 3
+Code to compute the results using data from https://www.patentsview.org/download/
+```{r, eval = FALSE}
+library(vroom)
+library(dplyr)
+library(lubridate)
+
+
+# Part 1
+col_types_assignee <- list(
+  id = col_character(),
+  type = col_character(),
+  name_first = col_character(),
+  name_last = col_character(),
+  organization = col_character()
+)
+assignee_tbl <- vroom(
+  file       = "assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_assignee,
+  na         = c("", "NA", "NULL")
+)
+
+
+col_types_patent_assignee <- list(
+  patent_id = col_character(),
+  assignee_id = col_character(),
+  location_id = col_character()
+)
+patent_assignee_tbl <- vroom(
+  file       = "patent_assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_patent_assignee,
+  na         = c("", "NA", "NULL")
+)
+
+num_patent_by_assignee_id <- count(patent_assignee_tbl,assignee_id)
+num_patent_by_assignee_id_t <- left_join(num_patent_by_assignee_id,assignee_tbl,by = c("assignee_id" = "id"))
+num_patent_by_assignee_id_us <- filter(num_patent_by_assignee_id_t, type == 2)
+num_patent_by_assignee_id_d <- arrange(num_patent_by_assignee_id_us,desc(n))
+top_ten_id <- num_patent_by_assignee_id_d[1:10,1]
+top_ten_name_id <- filter(assignee_tbl, id %in% unlist(top_ten_id))
+top_ten_name <- top_ten_name_id$organization    
+
+# Part 2
+col_types_patent <- list(
+  id = col_character(),
+  type = col_character(),
+  number = col_character(),
+  country = col_character(),
+  date = col_date("%Y-%m-%d"),
+  abstract = col_character(),
+  title = col_character()
+  
+)
+patent_tbl <- vroom(
+  file       = "patent.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_patent,
+  na         = c("", "NA", "NULL")
+)
+patent_2019_tbl <- filter(patent_tbl, year(date) == 2019)
+patent_assignee_2019_tbl <- filter(patent_assignee_tbl, patent_id %in% unlist(patent_2019_tbl$id))
+
+num_patent_by_assignee_id <- count(patent_assignee_2019_tbl,assignee_id)
+num_patent_by_assignee_id_t <- left_join(num_patent_by_assignee_id,assignee_tbl,by = c("assignee_id" = "id"))
+num_patent_by_assignee_id_us <- filter(num_patent_by_assignee_id_t, type == 2)
+num_patent_by_assignee_id_d <- arrange(num_patent_by_assignee_id_us,desc(n))
+top_ten_id <- num_patent_by_assignee_id_d[1:10,1]
+top_ten_name_id <- filter(assignee_tbl, id %in% unlist(top_ten_id))
+top_ten_name_2019 <- top_ten_name_id$organization   
+
+# Part 3
+col_types_uspc <- list(
+  uuid = col_character(),
+  patent_id = col_character(),
+  mainclass_id = col_character(),
+  subclass_id = col_character(),
+  sequence = col_character()
+  
+)
+uspc_tbl <- vroom(
+  file       = "uspc.tsv", 
+  delim      = "\t", 
+  col_types  = col_types_uspc,
+  na         = c("", "NA", "NULL")
+)
+
+num_patent_by_assignee_id <- count(patent_assignee_tbl,assignee_id)
+num_patent_by_assignee_id_t <- left_join(num_patent_by_assignee_id,assignee_tbl,by = c("assignee_id" = "id"))
+num_patent_by_assignee_id_d <- arrange(num_patent_by_assignee_id_t,desc(n))
+top_ten_id <- num_patent_by_assignee_id_d[1:10,1]
+top_ten_patent_id <- tibble(assignee_id = top_ten_id$assignee_id, patent_id = c(0,0,0,0,0,0,0,0,0,0))
+for(i in 1:length(top_ten_patent_id$assignee_id)){
+  top_ten_patent_id$patent_id[i] <- filter(patent_assignee_tbl, assignee_id == unlist(top_ten_patent_id$assignee_id[i]))$patent_id[1]
+}
+top_ten_mainclass_id <- left_join(top_ten_patent_id, uspc_tbl,by = "patent_id")
+top_ten_mainclass_id <- top_ten_mainclass_id[complete.cases(top_ten_mainclass_id),]
+top_main <- count(top_ten_mainclass_id, mainclass_id)
+top_main <- arrange(top_main, desc(n))
+top_five_main <- top_main[1:5,]
+top_main_five <- top_five_main$mainclass_id
+save(top_ten_name, top_ten_name_2019, top_main_five, file = "Challenge3.Rdata")
+
+```
+
+```{r}
+load(file = "Challenge3.Rdata")
+```
+## Part 3.1
+Top ten US companys by number of patents
+```{r}
+top_ten_name
+```
+## Part 3.2
+Top ten US companys by patents in 2019
+```{r}
+top_ten_name_2019
+```
+## Part 3.3
+Top five mainclasses
+```{r}
+load(file = "Challenge3.Rdata")
+print(top_main_five)
+```
+
+# Challenge 4
+Solution for the covid challenge
+## Challenge 4.1
+Total cases over time
+```{r}
+library(tidyverse)
+
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+covid_data_tbl$dateRep <- as.Date(covid_data_tbl$dateRep,format='%d/%m/%Y')
+covid_by_date_tbl <- tibble(date = unique(covid_data_tbl$dateRep), cases = length(unique(covid_data_tbl$dateRep)):1)
+covid_by_date_tbl <- arrange(covid_by_date_tbl, date)
+
+for(i in 1:length(covid_by_date_tbl$date)){
+  covid_by_date_tbl[i,2] <- sum(filter(covid_data_tbl, dateRep == unlist(covid_by_date_tbl[i,1]))$cases)
+}
+covid_by_date_sum_tbl <- covid_by_date_tbl
+for(i in 1:length(covid_by_date_tbl$date)){
+  for(j in 1:length(covid_by_date_tbl$date)){
+    if(j < i){
+      covid_by_date_sum_tbl[i,2] <- covid_by_date_sum_tbl[i,2] + covid_by_date_tbl[j,2]
+    }
+    
+  }
+}
+ggplot(data = covid_by_date_sum_tbl, aes(x = date, y = cases, color = 'red')) + 
+  geom_line(size = 1) + 
+  geom_text(label =  max(covid_by_date_sum_tbl$cases),x  = 1, y = 1) + 
+  theme_light() 
+```
+
+
+### Challenge 4.2
+Mortality rate by region
+```{r}
+library(tidyverse)
+
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+
+world <- map_data("world")
+
+covid_data_tbl <- covid_data_tbl %>% 
+  mutate(across(countriesAndTerritories, str_replace_all, "_", " ")) %>%
+  mutate(countriesAndTerritories = case_when(
+    
+    countriesAndTerritories == "United Kingdom" ~ "UK",
+    countriesAndTerritories == "United States of America" ~ "USA",
+    countriesAndTerritories == "Czechia" ~ "Czech Republic",
+    TRUE ~ countriesAndTerritories
+    
+  ))
+
+
+covid_country_tbl <- tibble(region = unique(covid_data_tbl$countriesAndTerritories), ratio = 0)
+for(i in 1:length(covid_country_tbl$region)){
+  covid_country_tbl$ratio[i] <- sum(filter(covid_data_tbl, countriesAndTerritories == unlist(covid_country_tbl$region[i]))$deaths) / 
+    filter(covid_data_tbl, countriesAndTerritories == unlist(covid_country_tbl$region[i]))$popData2019[1]
+}
+
+
+
+covid_country_tbl %>% ggplot(aes(fill = ratio)) +
+  geom_map(aes(map_id = region), map = world) + 
+  expand_limits(x = world$long, y = world$lat)
+```
